@@ -1,0 +1,51 @@
+# Nama workflow yang akan muncul di tab "Actions" GitHub
+name: Verilog Autograding
+
+# Pemicu: Jalankan workflow ini setiap kali ada 'push' ke repositori
+on: [push]
+
+jobs:
+  build-and-test:
+    # Gunakan server virtual Ubuntu versi terbaru untuk menjalankan tugas ini
+    runs-on: ubuntu-latest
+
+    steps:
+      # Langkah 1: Ambil (checkout) kode dari repositori ke server virtual
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Langkah 2: Instal Icarus Verilog di server virtual
+      - name: Install Icarus Verilog
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+
+      # Langkah 3: Kompilasi kode Verilog 
+      # Perintah ini akan menggabungkan testbench dosen dengan kode mahasiswa
+      - name: Compile Verilog code
+        run: iverilog -o test_sim testbench_master.v
+
+      # Langkah 4: Jalankan simulasi dan simpan semua outputnya ke dalam file bernama result.log
+      - name: Run simulation
+        run: vvp test_sim > result.log
+
+      # Langkah 5: Periksa file log untuk menilai dan memberikan status Lulus/Gagal
+      - name: Grade the submission
+        run: |
+          # Cari dan hitung jumlah baris yang berisi kata "[FAIL]" di file log.
+          # '|| true' ditambahkan agar perintah tidak error jika tidak ada kata "[FAIL]" yang ditemukan.
+          FAIL_COUNT=$(grep -c "\[FAIL\]" result.log || true)
+          
+          echo "--- Hasil Simulasi ---"
+          # Tampilkan isi lengkap file log agar mahasiswa bisa melihat feedback detail
+          cat result.log
+          echo "----------------------"
+          
+          # Logika penilaian: Jika ada 1 atau lebih kegagalan, maka tugas dianggap gagal.
+          if [ $FAIL_COUNT -ne 0 ]; then
+            echo "Terdapat $FAIL_COUNT test case yang gagal. Silakan perbaiki kodemu."
+            # Keluar dengan status error (1), ini akan membuat GitHub Action menampilkan tanda silang merah (❌)
+            exit 1
+          else
+            echo "Selamat! Semua test case berhasil."
+            # Keluar dengan status sukses (0), ini akan membuat GitHub Action menampilkan tanda centang hijau (✅)
+            exit 0
+          fi
